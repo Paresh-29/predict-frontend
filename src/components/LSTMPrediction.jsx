@@ -22,8 +22,7 @@ import {
 } from "recharts";
 import { Loader2 } from "lucide-react";
 
-// Define the backend URL
-const BACKEND_URL = "http://127.0.0.1:8000"; // Ensure this matches your FastAPI server address!
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 // Constant for LSTM time step
 const LSTM_INPUT_WINDOW = 100; // The TIME_STEP our LSTM expects
@@ -40,10 +39,10 @@ const stocks = [
 export default function LSTMPrediction() {
   const [selectedStock, setSelectedStock] = useState("");
   const [forecastTime, setForecastTime] = useState("5"); // Default to 5 days forecast
-  const [predictionData, setPredictionData] = useState([]); // Chart data - starts empty, no mockData
-  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [predictionData, setPredictionData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null); // Error message
-  const [latestPrediction, setLatestPrediction] = useState(null); // To display the last predicted price textually
+  const [latestPrediction, setLatestPrediction] = useState(null);
 
   // Helper to generate future dates for the chart
   const getNextDate = (currentDateStr) => {
@@ -292,8 +291,8 @@ export default function LSTMPrediction() {
                   />
                   <XAxis
                     dataKey="date"
-                    angle={-45} // Rotate labels
-                    textAnchor="end" // Anchor for rotation
+                    angle={-45}
+                    textAnchor="end"
                     tickFormatter={(tick) => {
                       // Format date to MM-DD
                       const date = new Date(tick);
@@ -304,7 +303,7 @@ export default function LSTMPrediction() {
                         .toString()
                         .padStart(2, "0")}`;
                     }}
-                    interval="preserveStartEnd" // Automatically space out labels
+                    interval="preserveStartEnd"
                   />
                   <YAxis />
                   <Tooltip

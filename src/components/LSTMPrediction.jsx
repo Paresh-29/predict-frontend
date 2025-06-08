@@ -44,11 +44,95 @@ export default function LSTMPrediction() {
   const [error, setError] = useState(null); // Error message
   const [latestPrediction, setLatestPrediction] = useState(null);
 
-  // Helper to generate future dates for the chart
-  const getNextDate = (currentDateStr) => {
-    const date = new Date(currentDateStr);
-    date.setDate(date.getDate() + 1);
-    return date.toISOString().slice(0, 10); //YYYY-MM-DD format
+  // // Helper to generate future dates for the chart
+  // const getNextDate = (currentDateStr) => {
+  //   const date = new Date(currentDateStr);
+  //   date.setDate(date.getDate() + 1);
+  //   return date.toISOString().slice(0, 10); //YYYY-MM-DD format
+  // };
+
+  // Helper to generate historical dates
+  const generateHistoricalDates = (endDate, numDays) => {
+    const dates = [];
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - (numDays - 1));
+
+    for (let i = 0; i < numDays; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      dates.push(currentDate.toISOString().slice(0, 10));
+    }
+    return dates;
+  };
+
+  // Improved chart data preparation with cleaner connection logic
+  const prepareChartData = (
+    historicalPrices,
+    predictedPrices,
+    forecastDays
+  ) => {
+    const chartPoints = [];
+
+    // Generate historical dates (ending yesterday)
+    const endDateForHistorical = new Date();
+    endDateForHistorical.setDate(endDateForHistorical.getDate() - 1);
+
+    const historicalDates = generateHistoricalDates(
+      endDateForHistorical,
+      LSTM_INPUT_WINDOW
+    );
+
+    // Add historical data points (excluding the last one for special handling)
+    historicalPrices.slice(0, -1).forEach((price, index) => {
+      chartPoints.push({
+        date: historicalDates[index],
+        actual: price,
+        predicted: null,
+      });
+    });
+
+    // Add the last historical point with only actual value (no predicted)
+    if (historicalPrices.length > 0) {
+      const lastHistoricalIndex = historicalPrices.length - 1;
+      chartPoints.push({
+        date: historicalDates[lastHistoricalIndex],
+        actual: historicalPrices[lastHistoricalIndex],
+        predicted: null,
+      });
+    }
+
+    // Create connection point - this will be yellow because it's part of predicted line
+    let currentDate = new Date(endDateForHistorical);
+    currentDate.setDate(currentDate.getDate() + 1); // Start from today
+
+    if (predictedPrices.length > 0) {
+      // Connection point: last historical price connects to first predicted price via yellow line
+      chartPoints.push({
+        date: currentDate.toISOString().slice(0, 10),
+        actual: null,
+        predicted: predictedPrices[0], // Only yellow line connects here
+      });
+
+      // Add a bridge point to ensure smooth connection
+      if (chartPoints.length >= 2) {
+        const lastHistoricalPrice = chartPoints[chartPoints.length - 2].actual;
+        chartPoints[chartPoints.length - 1].predicted = predictedPrices[0];
+        // Add the last historical point to predicted line for connection
+        chartPoints[chartPoints.length - 2].predicted = lastHistoricalPrice;
+      }
+    }
+
+    // Add remaining predicted data points
+    predictedPrices.slice(1).forEach((price, index) => {
+      currentDate.setDate(currentDate.getDate() + 1);
+      chartPoints.push({
+        date: currentDate.toISOString().slice(0, 10),
+        actual: null,
+        predicted: price,
+      });
+    });
+
+    return chartPoints;
   };
 
   const handlePredict = async () => {
@@ -71,7 +155,7 @@ export default function LSTMPrediction() {
 
     setIsLoading(true);
     setError(null);
-    setPredictionData([]); // Clear previous chart data
+    setPredictionData([]);
     setLatestPrediction(null);
 
     try {
@@ -95,8 +179,6 @@ export default function LSTMPrediction() {
         );
       }
 
-      const initialPrices = historicalDataAsFloats;
-
       // 3. Make Multi-Step Prediction Request
       const predictionResponse = await fetch(
         `${BACKEND_URL}/lstm/multi-predict`,
@@ -106,7 +188,7 @@ export default function LSTMPrediction() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            initial_prices: initialPrices,
+            initial_prices: historicalDataAsFloats,
             forecast_days: daysToForecast,
           }),
         }
@@ -122,61 +204,12 @@ export default function LSTMPrediction() {
       const predictionResult = await predictionResponse.json();
       const predictedPricesList = predictionResult.predicted_prices;
 
-      // 4. Prepare Data for the Chart (Adjusted to connect lines and improve X-axis dates)
-      const chartPoints = [];
-      const HISTORICAL_POINTS_FOR_CHART = LSTM_INPUT_WINDOW; // Show all 100 historical points for context
-
-      let endDateForHistorical = new Date();
-      endDateForHistorical.setDate(endDateForHistorical.getDate() - 1); // Adjust to 'yesterday' for last historical point
-
-      let historicalChartDates = [];
-      let startDateForHistorical = new Date(endDateForHistorical.getTime());
-      startDateForHistorical.setDate(
-        startDateForHistorical.getDate() - (HISTORICAL_POINTS_FOR_CHART - 1)
+      // 4. Prepare chart data with improved connection logic
+      const chartPoints = prepareChartData(
+        historicalDataAsFloats,
+        predictedPricesList,
+        daysToForecast
       );
-
-      for (let i = 0; i < HISTORICAL_POINTS_FOR_CHART; i++) {
-        const currentDateForHistorical = new Date(
-          startDateForHistorical.getTime() + i * 24 * 60 * 60 * 1000
-        );
-        historicalChartDates.push(
-          currentDateForHistorical.toISOString().slice(0, 10)
-        );
-      }
-
-      // Add recent historical data to chart (actual prices)
-      const recentHistoricalPrices = initialPrices.slice(
-        -HISTORICAL_POINTS_FOR_CHART
-      );
-      recentHistoricalPrices.forEach((price, index) => {
-        chartPoints.push({
-          date: historicalChartDates[index],
-          actual: price,
-          predicted: null,
-        });
-      });
-
-      // Connect the historical and predicted lines:
-      if (chartPoints.length > 0 && predictedPricesList.length > 0) {
-        const lastHistoricalPointIndex = chartPoints.length - 1;
-        chartPoints[lastHistoricalPointIndex].predicted =
-          predictedPricesList[0];
-      }
-
-      // Now add the rest of the predicted data (starting from the second prediction)
-      let currentChartDate =
-        chartPoints.length > 0
-          ? chartPoints[chartPoints.length - 1].date
-          : new Date().toISOString().slice(0, 10);
-
-      for (let i = 1; i < predictedPricesList.length; i++) {
-        currentChartDate = getNextDate(currentChartDate);
-        chartPoints.push({
-          date: currentChartDate,
-          actual: null,
-          predicted: predictedPricesList[i],
-        });
-      }
 
       setPredictionData(chartPoints);
       setLatestPrediction(predictedPricesList[predictedPricesList.length - 1]);
@@ -186,6 +219,28 @@ export default function LSTMPrediction() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Custom tooltip to show both values when available
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+          <p className="font-medium">{`Date: ${label}`}</p>
+          {payload.map((entry, index) => {
+            if (entry.value !== null) {
+              return (
+                <p key={index} style={{ color: entry.color }}>
+                  {`${entry.name}: $${entry.value.toFixed(2)}`}
+                </p>
+              );
+            }
+            return null;
+          })}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -249,7 +304,7 @@ export default function LSTMPrediction() {
           {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
           {latestPrediction !== null && !isLoading && !error && (
             <p className="text-green-600 mt-4 text-center text-lg font-bold">
-              Predicted Price for last forecast day:{" "}
+              Predicted Price for last forecast day: $
               {latestPrediction.toFixed(2)}
             </p>
           )}
@@ -282,8 +337,6 @@ export default function LSTMPrediction() {
                   data={predictionData}
                   margin={{ top: 5, right: 30, left: 20, bottom: 80 }}
                 >
-                  {" "}
-                  {/* Increased bottom margin */}
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="#e0e0e0"
@@ -294,7 +347,6 @@ export default function LSTMPrediction() {
                     angle={-45}
                     textAnchor="end"
                     tickFormatter={(tick) => {
-                      // Format date to MM-DD
                       const date = new Date(tick);
                       return `${(date.getMonth() + 1)
                         .toString()
@@ -305,15 +357,13 @@ export default function LSTMPrediction() {
                     }}
                     interval="preserveStartEnd"
                   />
-                  <YAxis />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                    }}
+                  <YAxis
+                    domain={["dataMin - 5", "dataMax + 5"]}
+                    tickFormatter={(value) => `$${value.toFixed(0)}`}
                   />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend
-                    layout="verticle"
+                    layout="vertical"
                     wrapperStyle={{
                       top: "center",
                       right: 0,
@@ -328,16 +378,17 @@ export default function LSTMPrediction() {
                     name="Actual Price"
                     strokeWidth={2}
                     dot={false}
+                    connectNulls={false}
                   />
                   <Line
                     type="monotone"
                     dataKey="predicted"
-                    // stroke="hsl(var(--secondary))"
                     stroke="#FFC107"
                     name="Predicted Price"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
+                    connectNulls={false}
                   />
                 </LineChart>
               </ResponsiveContainer>

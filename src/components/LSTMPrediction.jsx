@@ -23,6 +23,7 @@ import {
 import { Loader2 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+// const BACKEND_URL = "http://localhost:8000";
 
 // Constant for LSTM time step
 const LSTM_INPUT_WINDOW = 100; // The TIME_STEP our LSTM expects
@@ -34,14 +35,17 @@ const stocks = [
   { symbol: "MSFT", name: "Microsoft Corporation" },
   { symbol: "AMZN", name: "Amazon.com Inc." },
   { symbol: "TSLA", name: "Tesla Inc." },
+
+  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel Ltd." },
+  { symbol: "RELI", name: "Reliance Industries Ltd." },
 ];
 
 export default function LSTMPrediction() {
   const [selectedStock, setSelectedStock] = useState("");
-  const [forecastTime, setForecastTime] = useState("5"); // Default to 5 days forecast
+  const [forecastTime, setForecastTime] = useState("5");
   const [predictionData, setPredictionData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null); // Error message
+  const [error, setError] = useState(null);
   const [latestPrediction, setLatestPrediction] = useState(null);
 
   // // Helper to generate future dates for the chart
@@ -65,7 +69,6 @@ export default function LSTMPrediction() {
     return dates;
   };
 
-  // Improved chart data preparation with cleaner connection logic
   const prepareChartData = (
     historicalPrices,
     predictedPrices,
@@ -190,6 +193,7 @@ export default function LSTMPrediction() {
           body: JSON.stringify({
             initial_prices: historicalDataAsFloats,
             forecast_days: daysToForecast,
+            symbol: selectedStock,
           }),
         }
       );
@@ -304,7 +308,7 @@ export default function LSTMPrediction() {
           {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
           {latestPrediction !== null && !isLoading && !error && (
             <p className="text-green-600 mt-4 text-center text-lg font-bold">
-              Predicted Price for last forecast day: $
+              Predicted Price for last forecast day: Rs{" "}
               {latestPrediction.toFixed(2)}
             </p>
           )}
@@ -359,7 +363,7 @@ export default function LSTMPrediction() {
                   />
                   <YAxis
                     domain={["dataMin - 5", "dataMax + 5"]}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    tickFormatter={(value) => `Rs${value.toFixed(0)}`}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend

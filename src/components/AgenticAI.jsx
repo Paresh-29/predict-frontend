@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import { Loader2, Send, Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useRef } from "react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -68,6 +71,17 @@ export default function AgenticAI() {
     }
   };
 
+  useEffect(() => {
+    document.getElementById("chat-input")?.focus();
+  }, []);
+
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <motion.div
@@ -77,62 +91,72 @@ export default function AgenticAI() {
       >
         <Card className="p-6">
           <ScrollArea className="h-[400px] pr-4">
-            <AnimatePresence>
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className={`flex gap-3 mb-4 ${
-                    message.role === "assistant"
-                      ? "flex-row"
-                      : "flex-row-reverse"
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            <div
+              ref={scrollRef}
+              className="flex flex-col overflow-y-auto max-h-[400px] scroll-smooth"
+            >
+              <AnimatePresence>
+                {messages.map((message) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className={`flex gap-3 mb-4 ${
                       message.role === "assistant"
-                        ? "bg-primary/10"
-                        : "bg-secondary/10"
+                        ? "flex-row"
+                        : "flex-row-reverse"
                     }`}
                   >
-                    {message.role === "assistant" ? (
-                      <Bot className="w-4 h-4" />
-                    ) : (
-                      <User className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div
-                    className={`flex-1 rounded-lg p-4 ${
-                      message.role === "assistant"
-                        ? "bg-primary/10 text-black"
-                        : "bg-secondary/10 text-secondary-foreground"
-                    }`}
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        message.role === "assistant"
+                          ? "bg-primary/10"
+                          : "bg-secondary/10"
+                      }`}
+                    >
+                      {message.role === "assistant" ? (
+                        <Bot className="w-4 h-4" />
+                      ) : (
+                        <User className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div
+                      className={`flex-1 rounded-lg p-4 ${
+                        message.role === "assistant"
+                          ? "bg-primary/10 text-black"
+                          : "bg-secondary/10 text-secondary-foreground"
+                      }`}
+                    >
+                      <div className="prose prose-sm sm:prose-base prose-neutral max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3 mb-4"
                   >
-                    {message.content}
-                  </div>
-                </motion.div>
-              ))}
-              {isLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-3 mb-4"
-                >
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  </div>
-                  <div className="flex-1 rounded-lg p-4 bg-primary/10">
-                    Analyzing market data...
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                    <div className="flex-1 rounded-lg p-4 bg-primary/10">
+                      Analyzing market data...
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </ScrollArea>
         </Card>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
+            id="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about stock predictions..."

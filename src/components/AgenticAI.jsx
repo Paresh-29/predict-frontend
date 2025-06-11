@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import { useRef } from "react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+// const BACKEND_URL = "http://localhost:8000";
 
 export default function AgenticAI() {
   const [input, setInput] = useState("");
@@ -83,17 +84,14 @@ export default function AgenticAI() {
   }, [messages]);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
-      >
-        <Card className="p-6">
-          <ScrollArea className="h-[400px] pr-4">
+    <div className="h-screen flex flex-col w-full  max-w-7xl mx-auto p-4 space-y-4">
+      {/* Message Area */}
+      <div className="flex-1 overflow-hidden">
+        <Card className="h-full p-4">
+          <ScrollArea className="h-full pr-2">
             <div
               ref={scrollRef}
-              className="flex flex-col overflow-y-auto max-h-[400px] scroll-smooth"
+              className="flex flex-col overflow-y-auto max-h-full scroll-smooth"
             >
               <AnimatePresence>
                 {messages.map((message) => (
@@ -154,20 +152,22 @@ export default function AgenticAI() {
             </div>
           </ScrollArea>
         </Card>
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            id="chat-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about stock predictions..."
-            className="flex-1"
-            disabled={isLoading}
-          />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
-        </form>
-      </motion.div>
+      </div>
+
+      {/* Input Area */}
+      <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
+        <Input
+          id="chat-input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask about stock predictions..."
+          className="flex-1"
+          disabled={isLoading}
+        />
+        <Button type="submit" disabled={isLoading || !input.trim()}>
+          <Send className="w-4 h-4" />
+        </Button>
+      </form>
     </div>
   );
 }

@@ -95,10 +95,10 @@ function SidebarContent({ isCollapsed }) {
           Home
         </NavItem>
         <NavItem to="/lstm" icon={TrendingUp} isCollapsed={isCollapsed}>
-          LSTM
+          Short-Term Forecasts
         </NavItem>
         <NavItem to="/agentic-ai" icon={Brain} isCollapsed={isCollapsed}>
-          Agentic AI
+          Market Outlook AI
         </NavItem>
       </nav>
     </ScrollArea>

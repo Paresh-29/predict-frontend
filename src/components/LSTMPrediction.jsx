@@ -56,6 +56,65 @@ export default function LSTMPrediction() {
     return dates;
   };
 
+  // const prepareChartData = (
+  //   historicalPrices,
+  //   predictedPrices,
+  //   forecastDays,
+  //   lastDate
+  // ) => {
+  //   const chartPoints = [];
+  //   const endDateForHistorical = new Date(lastDate);
+  //   const historicalDates = generateHistoricalDates(
+  //     endDateForHistorical,
+  //     LSTM_INPUT_WINDOW
+  //   );
+
+  //   historicalPrices.slice(0, -1).forEach((price, index) => {
+  //     chartPoints.push({
+  //       date: historicalDates[index],
+  //       actual: price,
+  //       predicted: null,
+  //     });
+  //   });
+
+  //   if (historicalPrices.length > 0) {
+  //     const lastIndex = historicalPrices.length - 1;
+  //     chartPoints.push({
+  //       date: historicalDates[lastIndex],
+  //       actual: historicalPrices[lastIndex],
+  //       predicted: null,
+  //     });
+  //   }
+
+  //   let currentDate = new Date(endDateForHistorical);
+  //   currentDate.setDate(currentDate.getDate() + 1);
+
+  //   if (predictedPrices.length > 0) {
+  //     chartPoints.push({
+  //       date: currentDate.toISOString().slice(0, 10),
+  //       actual: null,
+  //       predicted: predictedPrices[0],
+  //     });
+
+  //     if (chartPoints.length >= 2) {
+  //       const lastHistoricalPrice = chartPoints[chartPoints.length - 2].actual;
+  //       chartPoints[chartPoints.length - 1].predicted = predictedPrices[0];
+  //       chartPoints[chartPoints.length - 2].predicted = lastHistoricalPrice;
+  //     }
+  //   }
+
+  //   predictedPrices.slice(1).forEach((price) => {
+  //     currentDate.setDate(currentDate.getDate() + 1);
+  //     chartPoints.push({
+  //       date: currentDate.toISOString().slice(0, 10),
+  //       actual: null,
+  //       predicted: price,
+  //     });
+  //   });
+
+  //   return chartPoints;
+  // };
+
   const prepareChartData = (
     historicalPrices,
     predictedPrices,
@@ -63,12 +122,17 @@ export default function LSTMPrediction() {
     lastDate
   ) => {
     const chartPoints = [];
-    const endDateForHistorical = new Date(lastDate);
+
+    // Force the historical end date to 01-01-2025
+    const endDateForHistorical = new Date("2025-01-01");
+
+    // Generate past dates for historical prices
     const historicalDates = generateHistoricalDates(
       endDateForHistorical,
-      LSTM_INPUT_WINDOW
+      historicalPrices.length
     );
 
+    // Add historical prices
     historicalPrices.slice(0, -1).forEach((price, index) => {
       chartPoints.push({
         date: historicalDates[index],
@@ -77,6 +141,7 @@ export default function LSTMPrediction() {
       });
     });
 
+    // Last historical point
     if (historicalPrices.length > 0) {
       const lastIndex = historicalPrices.length - 1;
       chartPoints.push({
@@ -86,7 +151,8 @@ export default function LSTMPrediction() {
       });
     }
 
-    let currentDate = new Date(endDateForHistorical);
+    // Start predictions from 2025-01-02
+    let currentDate = new Date("2025-01-01");
     currentDate.setDate(currentDate.getDate() + 1);
 
     if (predictedPrices.length > 0) {
@@ -96,6 +162,7 @@ export default function LSTMPrediction() {
         predicted: predictedPrices[0],
       });
 
+      // Connect predicted line to last historical price visually
       if (chartPoints.length >= 2) {
         const lastHistoricalPrice = chartPoints[chartPoints.length - 2].actual;
         chartPoints[chartPoints.length - 1].predicted = predictedPrices[0];
@@ -103,6 +170,7 @@ export default function LSTMPrediction() {
       }
     }
 
+    // Add remaining predicted prices
     predictedPrices.slice(1).forEach((price) => {
       currentDate.setDate(currentDate.getDate() + 1);
       chartPoints.push({

@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
@@ -43,6 +44,20 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            color: theme("colors.foreground"),
+            a: { color: theme("colors.primary.DEFAULT") },
+          },
+        },
+        dark: {
+          css: {
+            color: theme("colors.foreground"),
+            a: { color: theme("colors.primary.DEFAULT") },
+          },
+        },
+      }),
     },
   },
   plugins: [require("@tailwindcss/typography")],

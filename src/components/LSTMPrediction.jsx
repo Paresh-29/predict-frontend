@@ -25,19 +25,15 @@ import { Loader2 } from "lucide-react";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 // const BACKEND_URL = "http://localhost:8000";
 
-// Constant for LSTM time step
-const LSTM_INPUT_WINDOW = 100; // The TIME_STEP our LSTM expects
+const LSTM_INPUT_WINDOW = 100;
 
-// Stock list for the dropdown
 const stocks = [
-  { symbol: "AAPL", name: "Apple Inc." },
-  { symbol: "GOOGL", name: "Alphabet Inc." },
-  { symbol: "MSFT", name: "Microsoft Corporation" },
-  { symbol: "AMZN", name: "Amazon.com Inc." },
-  { symbol: "TSLA", name: "Tesla Inc." },
-
   { symbol: "BHARTIARTL.NS", name: "Bharti Airtel Ltd." },
-  { symbol: "RELI", name: "Reliance Industries Ltd." },
+  { symbol: "RELIANCE.NS", name: "Reliance Industries Ltd." },
+  {
+    symbol: "ADANIPORTS.NS",
+    name: "Adani Ports and Special Economic Zone Ltd.",
+  },
 ];
 
 export default function LSTMPrediction() {
@@ -48,19 +44,10 @@ export default function LSTMPrediction() {
   const [error, setError] = useState(null);
   const [latestPrediction, setLatestPrediction] = useState(null);
 
-  // // Helper to generate future dates for the chart
-  // const getNextDate = (currentDateStr) => {
-  //   const date = new Date(currentDateStr);
-  //   date.setDate(date.getDate() + 1);
-  //   return date.toISOString().slice(0, 10); //YYYY-MM-DD format
-  // };
-
-  // Helper to generate historical dates
   const generateHistoricalDates = (endDate, numDays) => {
     const dates = [];
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (numDays - 1));
-
     for (let i = 0; i < numDays; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
@@ -72,20 +59,16 @@ export default function LSTMPrediction() {
   const prepareChartData = (
     historicalPrices,
     predictedPrices,
-    forecastDays
+    forecastDays,
+    lastDate
   ) => {
     const chartPoints = [];
-
-    // Generate historical dates (ending yesterday)
-    const endDateForHistorical = new Date();
-    endDateForHistorical.setDate(endDateForHistorical.getDate() - 1);
-
+    const endDateForHistorical = new Date(lastDate);
     const historicalDates = generateHistoricalDates(
       endDateForHistorical,
       LSTM_INPUT_WINDOW
     );
 
-    // Add historical data points (excluding the last one for special handling)
     historicalPrices.slice(0, -1).forEach((price, index) => {
       chartPoints.push({
         date: historicalDates[index],
@@ -94,39 +77,33 @@ export default function LSTMPrediction() {
       });
     });
 
-    // Add the last historical point with only actual value (no predicted)
     if (historicalPrices.length > 0) {
-      const lastHistoricalIndex = historicalPrices.length - 1;
+      const lastIndex = historicalPrices.length - 1;
       chartPoints.push({
-        date: historicalDates[lastHistoricalIndex],
-        actual: historicalPrices[lastHistoricalIndex],
+        date: historicalDates[lastIndex],
+        actual: historicalPrices[lastIndex],
         predicted: null,
       });
     }
 
-    // Create connection point - this will be yellow because it's part of predicted line
     let currentDate = new Date(endDateForHistorical);
-    currentDate.setDate(currentDate.getDate() + 1); // Start from today
+    currentDate.setDate(currentDate.getDate() + 1);
 
     if (predictedPrices.length > 0) {
-      // Connection point: last historical price connects to first predicted price via yellow line
       chartPoints.push({
         date: currentDate.toISOString().slice(0, 10),
         actual: null,
-        predicted: predictedPrices[0], // Only yellow line connects here
+        predicted: predictedPrices[0],
       });
 
-      // Add a bridge point to ensure smooth connection
       if (chartPoints.length >= 2) {
         const lastHistoricalPrice = chartPoints[chartPoints.length - 2].actual;
         chartPoints[chartPoints.length - 1].predicted = predictedPrices[0];
-        // Add the last historical point to predicted line for connection
         chartPoints[chartPoints.length - 2].predicted = lastHistoricalPrice;
       }
     }
 
-    // Add remaining predicted data points
-    predictedPrices.slice(1).forEach((price, index) => {
+    predictedPrices.slice(1).forEach((price) => {
       currentDate.setDate(currentDate.getDate() + 1);
       chartPoints.push({
         date: currentDate.toISOString().slice(0, 10),
@@ -139,12 +116,12 @@ export default function LSTMPrediction() {
   };
 
   const handlePredict = async () => {
-    // 1. Basic validation
     if (!selectedStock) {
       setError("Please select a stock.");
       return;
     }
-    const daysToForecast = parseInt(forecastTime, 10);
+
+    const daysToForecast = parseInt(forecastTime.trim(), 10);
     if (isNaN(daysToForecast) || daysToForecast <= 0) {
       setError(
         "Please enter a valid number of forecasting days (e.g., 1 to 365)."
@@ -162,27 +139,38 @@ export default function LSTMPrediction() {
     setLatestPrediction(null);
 
     try {
-      // 2. Fetch Historical Data from backend
       const historicalResponse = await fetch(
         `${BACKEND_URL}/api/historical_prices?symbol=${selectedStock}&lookback_days=${LSTM_INPUT_WINDOW}`
       );
       if (!historicalResponse.ok) {
         const errData = await historicalResponse.json();
-        throw new Error(
-          errData.detail ||
-            `Failed to fetch historical data for ${selectedStock}`
-        );
-      }
-      const historicalDataAsFloats = await historicalResponse.json();
-
-      // Ensure we have exactly LSTM_INPUT_WINDOW data points
-      if (historicalDataAsFloats.length !== LSTM_INPUT_WINDOW) {
-        throw new Error(
-          `Insufficient historical data for ${selectedStock}. Need ${LSTM_INPUT_WINDOW}, got ${historicalDataAsFloats.length}.`
-        );
+        throw new Error(errData.detail || "Failed to fetch historical data.");
       }
 
-      // 3. Make Multi-Step Prediction Request
+      // const historicalJson = await historicalResponse.json();
+      // const historicalDataAsFloats = historicalJson.historical_price;
+      // const lastDate = historicalJson.last_date;
+      //
+      // if (historicalDataAsFloats.length !== LSTM_INPUT_WINDOW) {
+      //   throw new Error(
+      //     `Insufficient historical data. Required: ${LSTM_INPUT_WINDOW}, Got: ${historicalDataAsFloats.length}`,
+      //   );
+      // }
+
+      const historicalJson = await historicalResponse.json();
+      console.log("Historical JSON:", historicalJson);
+
+      const historicalDataAsFloats = historicalJson?.historical_prices;
+      const lastDate = historicalJson?.last_date;
+      console.log("adani last date:", lastDate);
+
+      if (!historicalDataAsFloats || !Array.isArray(historicalDataAsFloats)) {
+        throw new Error("Historical price data is missing or invalid.");
+      }
+      if (!lastDate) {
+        throw new Error("Last date from historical data is missing.");
+      }
+
       const predictionResponse = await fetch(
         `${BACKEND_URL}/lstm/multi-predict`,
         {
@@ -200,23 +188,21 @@ export default function LSTMPrediction() {
 
       if (!predictionResponse.ok) {
         const errData = await predictionResponse.json();
-        throw new Error(
-          errData.detail ||
-            `Failed to get multi-step prediction for ${selectedStock}`
-        );
+        throw new Error(errData.detail || "Prediction request failed.");
       }
+
       const predictionResult = await predictionResponse.json();
       const predictedPricesList = predictionResult.predicted_prices;
 
-      // 4. Prepare chart data with improved connection logic
       const chartPoints = prepareChartData(
         historicalDataAsFloats,
         predictedPricesList,
-        daysToForecast
+        daysToForecast,
+        lastDate
       );
 
       setPredictionData(chartPoints);
-      setLatestPrediction(predictedPricesList[predictedPricesList.length - 1]);
+      setLatestPrediction(predictedPricesList.at(-1));
     } catch (err) {
       console.error("Error during prediction:", err);
       setError(err.message || "An unexpected error occurred.");
@@ -225,7 +211,6 @@ export default function LSTMPrediction() {
     }
   };
 
-  // Custom tooltip to show both values when available
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -235,7 +220,7 @@ export default function LSTMPrediction() {
             if (entry.value !== null) {
               return (
                 <p key={index} style={{ color: entry.color }}>
-                  {`${entry.name}: $${entry.value.toFixed(2)}`}
+                  {`${entry.name}: ₹${entry.value.toFixed(2)}`}
                 </p>
               );
             }
@@ -262,9 +247,21 @@ export default function LSTMPrediction() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Choose a stock" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-background border border-border text-foreground shadow-md">
                   {stocks.map((stock) => (
-                    <SelectItem key={stock.symbol} value={stock.symbol}>
+                    <SelectItem
+                      key={stock.symbol}
+                      value={stock.symbol}
+                      className={`
+                        px-3 py-2 cursor-pointer rounded-sm text-sm
+                        data-[state=checked]:bg-primary data-[state=checked]:text-white
+                        data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground
+                        dark:data-[highlighted]:bg-primary dark:data-[highlighted]:text-white
+                        dark:data-[state=checked]:bg-primary dark:data-[state=checked]:text-white
+                        [&>svg]:hidden [&_svg]:hidden [&>*>svg]:hidden
+                        [&::before]:hidden [&::after]:hidden
+                      `}
+                    >
                       {stock.symbol} - {stock.name}
                     </SelectItem>
                   ))}
@@ -286,14 +283,12 @@ export default function LSTMPrediction() {
               />
             </div>
           </div>
+
           <Button
             onClick={handlePredict}
             className="w-full mt-6"
             disabled={
-              isLoading ||
-              !selectedStock ||
-              parseInt(forecastTime, 10) <= 0 ||
-              isNaN(parseInt(forecastTime, 10))
+              isLoading || !selectedStock || parseInt(forecastTime, 10) <= 0
             }
           >
             {isLoading ? (
@@ -305,10 +300,20 @@ export default function LSTMPrediction() {
               "Predict Stock Movement"
             )}
           </Button>
-          {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
+
+          {error && (
+            <motion.p
+              className="text-red-500 mt-4 text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {error}
+            </motion.p>
+          )}
+
           {latestPrediction !== null && !isLoading && !error && (
             <p className="text-green-600 mt-4 text-center text-lg font-bold">
-              Predicted Price for last forecast day: Rs{" "}
+              Predicted Price for last forecast day: ₹
               {latestPrediction.toFixed(2)}
             </p>
           )}
@@ -363,7 +368,7 @@ export default function LSTMPrediction() {
                   />
                   <YAxis
                     domain={["dataMin - 5", "dataMax + 5"]}
-                    tickFormatter={(value) => `Rs${value.toFixed(0)}`}
+                    tickFormatter={(value) => `₹${value.toFixed(0)}`}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend

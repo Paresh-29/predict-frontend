@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import { Loader2, Send, Bot, User } from "lucide-react";
+import { Loader2, Send, Bot, User, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useRef } from "react";
+import { toast } from "react-toastify";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-// const BACKEND_URL = "http://localhost:8000";
 
 export default function AgenticAI() {
   const [input, setInput] = useState("");
@@ -43,22 +42,16 @@ export default function AgenticAI() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        const aiMessage = {
-          id: (Date.now() + 1).toString(),
-          content: data.content,
-          role: "assistant",
-        };
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        content:
+          response.ok && data.content
+            ? data.content
+            : "Sorry, I couldn't fetch the stock analysis at this moment.",
+        role: "assistant",
+      };
 
-        setMessages((prev) => [...prev, aiMessage]);
-      } else {
-        const aiMessage = {
-          id: (Date.now() + 1).toString(),
-          content: "Sorry, I couldn't fetch the stock analysis at this moment.",
-          role: "assistant",
-        };
-        setMessages((prev) => [...prev, aiMessage]);
-      }
+      setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
       console.error("Error fetching stock prediction:", error);
       const aiMessage = {
@@ -81,11 +74,11 @@ export default function AgenticAI() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   return (
-    <div className="h-screen flex flex-col w-full  max-w-7xl mx-auto p-4 space-y-4">
-      {/* Message Area */}
+    <div className="h-screen flex flex-col w-full max-w-7xl mx-auto p-4 space-y-4">
+      {/* Chat Area */}
       <div className="flex-1 overflow-hidden">
         <Card className="h-full p-4">
           <ScrollArea className="h-full pr-2">
@@ -106,6 +99,7 @@ export default function AgenticAI() {
                         : "flex-row-reverse"
                     }`}
                   >
+                    {/* Avatar */}
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         message.role === "assistant"
@@ -119,21 +113,47 @@ export default function AgenticAI() {
                         <User className="w-4 h-4" />
                       )}
                     </div>
+
+                    {/* Message */}
                     <div
-                      className={`flex-1 rounded-lg p-4 ${
+                      className={`flex-1 rounded-lg p-4 relative group ${
                         message.role === "assistant"
-                          ? "bg-primary/10 text-black"
+                          ? "bg-primary/10 text-black dark:text-white"
                           : "bg-secondary/10 text-secondary-foreground"
                       }`}
                     >
-                      <div className="prose prose-sm sm:prose-base prose-neutral max-w-none">
+                      {/* Bot name */}
+                      {message.role === "assistant" && (
+                        <div className="text-xs font-semibold mb-1 text-muted-foreground">
+                          StockBot
+                        </div>
+                      )}
+
+                      {/* Markdown content */}
+                      <div className="prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
                       </div>
+
+                      {/* Copy button for assistant messages */}
+                      {message.role === "assistant" && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(message.content);
+                            toast.success("Copied to clipboard!");
+                          }}
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Copy message"
+                        >
+                          <Copy className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}
+
+                {/* Typing animation */}
                 {isLoading && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -141,10 +161,14 @@ export default function AgenticAI() {
                     className="flex gap-3 mb-4"
                   >
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Bot className="w-4 h-4" />
                     </div>
-                    <div className="flex-1 rounded-lg p-4 bg-primary/10">
-                      Analyzing market data...
+                    <div className="flex-1 rounded-lg px-4 py-2 bg-primary/10">
+                      <div className="flex space-x-1 animate-pulse">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -154,7 +178,7 @@ export default function AgenticAI() {
         </Card>
       </div>
 
-      {/* Input Area */}
+      {/* Input Field */}
       <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
         <Input
           id="chat-input"

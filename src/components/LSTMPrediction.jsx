@@ -56,75 +56,30 @@ export default function LSTMPrediction() {
     return dates;
   };
 
-  // const prepareChartData = (
-  //   historicalPrices,
-  //   predictedPrices,
-  //   forecastDays,
-  //   lastDate
-  // ) => {
-  //   const chartPoints = [];
-  //   const endDateForHistorical = new Date(lastDate);
-  //   const historicalDates = generateHistoricalDates(
-  //     endDateForHistorical,
-  //     LSTM_INPUT_WINDOW
-  //   );
 
-  //   historicalPrices.slice(0, -1).forEach((price, index) => {
-  //     chartPoints.push({
-  //       date: historicalDates[index],
-  //       actual: price,
-  //       predicted: null,
-  //     });
-  //   });
-
-  //   if (historicalPrices.length > 0) {
-  //     const lastIndex = historicalPrices.length - 1;
-  //     chartPoints.push({
-  //       date: historicalDates[lastIndex],
-  //       actual: historicalPrices[lastIndex],
-  //       predicted: null,
-  //     });
-  //   }
-
-  //   let currentDate = new Date(endDateForHistorical);
-  //   currentDate.setDate(currentDate.getDate() + 1);
-
-  //   if (predictedPrices.length > 0) {
-  //     chartPoints.push({
-  //       date: currentDate.toISOString().slice(0, 10),
-  //       actual: null,
-  //       predicted: predictedPrices[0],
-  //     });
-
-  //     if (chartPoints.length >= 2) {
-  //       const lastHistoricalPrice = chartPoints[chartPoints.length - 2].actual;
-  //       chartPoints[chartPoints.length - 1].predicted = predictedPrices[0];
-  //       chartPoints[chartPoints.length - 2].predicted = lastHistoricalPrice;
-  //     }
-  //   }
-
-  //   predictedPrices.slice(1).forEach((price) => {
-  //     currentDate.setDate(currentDate.getDate() + 1);
-  //     chartPoints.push({
-  //       date: currentDate.toISOString().slice(0, 10),
-  //       actual: null,
-  //       predicted: price,
-  //     });
-  //   });
-
-  //   return chartPoints;
-  // };
+  const customEndDates = {
+    "BHARTIARTL.NS": "2025-06-09",
+    "RELIANCE.NS": "2025-06-09",
+    "ADANIPORTS.NS": "2025-01-01",
+  }
 
   const prepareChartData = (
     historicalPrices,
     predictedPrices,
     forecastDays,
-    lastDate
+    lastDate,
+    symbol,
   ) => {
     const chartPoints = [];
 
-    // Force the historical end date to 01-01-2025
-    const endDateForHistorical = new Date("2025-01-01");
+
+    // use custom date if available, else use lastDate
+    const safeSymbol = symbol?.trim();
+    const endDateStr = customEndDates[safeSymbol];
+    const endDateForHistorical = new Date(endDateStr);
+
+
+    console.log("Using endDate for:", safeSymbol, "=>", endDateStr);
 
     // Generate past dates for historical prices
     const historicalDates = generateHistoricalDates(
@@ -151,8 +106,8 @@ export default function LSTMPrediction() {
       });
     }
 
-    // Start predictions from 2025-01-02
-    let currentDate = new Date("2025-01-01");
+    // prediction starts from the next day after the last historical date
+    let currentDate = new Date(endDateForHistorical);
     currentDate.setDate(currentDate.getDate() + 1);
 
     if (predictedPrices.length > 0) {
@@ -215,15 +170,6 @@ export default function LSTMPrediction() {
         throw new Error(errData.detail || "Failed to fetch historical data.");
       }
 
-      // const historicalJson = await historicalResponse.json();
-      // const historicalDataAsFloats = historicalJson.historical_price;
-      // const lastDate = historicalJson.last_date;
-      //
-      // if (historicalDataAsFloats.length !== LSTM_INPUT_WINDOW) {
-      //   throw new Error(
-      //     `Insufficient historical data. Required: ${LSTM_INPUT_WINDOW}, Got: ${historicalDataAsFloats.length}`,
-      //   );
-      // }
 
       const historicalJson = await historicalResponse.json();
       console.log("Historical JSON:", historicalJson);
@@ -266,7 +212,8 @@ export default function LSTMPrediction() {
         historicalDataAsFloats,
         predictedPricesList,
         daysToForecast,
-        lastDate
+        lastDate,
+        selectedStock
       );
 
       setPredictionData(chartPoints);
@@ -282,8 +229,8 @@ export default function LSTMPrediction() {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-          <p className="font-medium">{`Date: ${label}`}</p>
+        <div className="bg-background p-3 border border-border rounded shadow-lg">
+          <p className="font-medium text-foreground">{`Date: ${label}`}</p>
           {payload.map((entry, index) => {
             if (entry.value !== null) {
               return (
@@ -428,9 +375,9 @@ export default function LSTMPrediction() {
                       return `${(date.getMonth() + 1)
                         .toString()
                         .padStart(2, "0")}-${date
-                        .getDate()
-                        .toString()
-                        .padStart(2, "0")}`;
+                          .getDate()
+                          .toString()
+                          .padStart(2, "0")}`;
                     }}
                     interval="preserveStartEnd"
                   />

@@ -11,6 +11,8 @@ import { toast } from "react-toastify";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
+console.log("Backend URL:", BACKEND_URL);
+
 export default function AgenticAI() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -31,7 +33,7 @@ export default function AgenticAI() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${BACKEND_URL}/predict`, {
+      const response = await fetch(`${BACKEND_URL}/predict/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
